@@ -32,10 +32,11 @@ test -x "$app/Contents/MacOS/$executable"
 test -s "$app/Contents/_CodeSignature/CodeResources"
 codesign --verify --deep --strict --verbose=4 "$app"
 
+# Intel CEF resource dylibs can be unsigned; the bundle verification above
+# checks their sealed contents. Check the target architecture of every Mach-O.
 while IFS= read -r -d '' bundle_file; do
   if [[ "$(file -b "$bundle_file")" == *Mach-O* ]]; then
     lipo "$bundle_file" -verify_arch "$macos_arch"
-    codesign --verify --strict --verbose=2 "$bundle_file"
   fi
 done < <(find "$app" -type f -print0)
 

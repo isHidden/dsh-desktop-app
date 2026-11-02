@@ -78,15 +78,21 @@ deno task build:macos:x86_64
 open ./dist/macos/x86_64/DSH-Desktop.app
 ```
 
-macOS 分发包在 Linux 交叉构建为完整 `.app` tar.gz：
+macOS 分发包须在 Mac 上打包，以完成组装后的 ad-hoc 签名和解包校验：
 
 ```bash
 deno task package:macos:aarch64
 deno task package:macos:x86_64
 ```
 
+Linux 上仍可运行 `build:macos:*` 生成开发包；`package:macos:*` 会拒绝在 Linux
+上生成缺少完整签名的发行包。 CI 对两种 Mac 架构执行打包、解包后的签名和架构验证，通过 `open`
+启动解压产物并检查进程存活，保存截图和日志。
+这覆盖启动检查；仍需人工确认窗口出现“选择服务器”页面，并完成下面的连接场景。
+
 解压对应的 `dist/macos/DSH-Desktop-macos-*.tar.gz` 后运行完整 `.app`。产物未进行 Apple Developer ID
-签名或 notarization，首次测试可能需要在 Finder 中右键选择“打开”。实时查看日志：
+签名或 notarization；首次下载的 Gatekeeper
+拦截与“已损坏”排查见[发布制品说明](RELEASE_ARTIFACTS.md)。 实时查看日志：
 
 ```bash
 log_dir="$HOME/Library/Logs/dsh-desktop"

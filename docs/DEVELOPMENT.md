@@ -163,8 +163,11 @@ deno task dev
 | `deno task package:macos:x86_64`    | `dist/macos/DSH-Desktop-macos-x86_64.tar.gz`          |
 
 Windows 构建脚本会规范化 launcher/runtime 文件名，并使用固定版本的 `resedit` 把项目 ICO 写入 PE
-资源。Windows ZIP 和 macOS tar.gz 可以在 Linux CI 上交叉构建。macOS `.app` 当前未进行 Apple
-Developer ID 签名或 notarization。
+资源。Windows ZIP 可以在 Linux CI 上交叉构建。macOS `build:*` 任务仍可在 Linux 生成开发用的
+`.app`，但 Deno 2.9.7 在 Linux 会跳过组装后的应用签名，因此不能直接作为发行包。 macOS `package:*`
+任务要求在 Mac 上执行，利用 Deno 的原生 ad-hoc 签名，并对 tar.gz 重新解压后的完整应用验证签名、所有
+Mach-O 架构、入口执行权限和符号链接。签名校验失败时任务失败。 当前尚未配置 Apple Developer ID 签名或
+notarization；下载隔离的处理见[发布制品说明](RELEASE_ARTIFACTS.md)。
 
 `assets/icon-macos.png` 是 1024 px macOS 生产位图：图稿占 824 px，四边各保留 100 px 透明留白，
 以匹配 Dock 中其他 macOS 应用的视觉尺寸。图标测试校验生产位图、标准 ICNS 槽位、各尺寸可见边界以及
@@ -178,8 +181,10 @@ Linux 目录包和 AppImage 任务供源码用户使用；滚动 `latest` Releas
 Pull Request 会运行：
 
 - Linux x86_64、Windows x86_64、macOS arm64、macOS x86_64 源码检查和单元测试。
+- macOS arm64 与 x86_64 原生打包、解包后的签名校验和启动检查；截图、日志及分发包保存在 Actions
+  artifacts。
 
-`main` 上述检查全部成功后，CI 在 Linux 上交叉构建四个 Windows/macOS 分发包，再删除旧滚动 `latest`
+`main` 上述检查全部成功后，CI 还会在 Linux 上交叉构建两个 Windows 分发包，再删除旧滚动 `latest`
 Release 和同名 tag，并重新创建同名 Release。发布任务会确认运行对应当前
 `main`，防止较旧的工作流覆盖较新的制品。
 
@@ -190,7 +195,7 @@ app.ts                         桌面生命周期、bindings 与安全导航
 main.ts                        CEF 入口
 main_webview.ts                WebView2 入口
 assets/                        SVG、PNG、Windows ICO 与 macOS ICNS
-scripts/                       Windows 打包辅助脚本
+scripts/                       Windows 打包、macOS 分发验证与构建信息脚本
 src/app_paths.ts               跨平台配置和日志路径
 src/dsh_web.ts                 DSH Web URL 与启动 token 解析工具
 src/hidden_process.ts          隐藏子进程与独立输出文件
@@ -209,6 +214,7 @@ docs/                          开发、发布和 GUI 验证文档
 
 - OpenSSH 认证依赖密钥或 `ssh-agent`，应用不提供密码和 passphrase 交互。
 - SSH 进程意外退出后会返回选择页，目前不自动重连。
-- macOS 分发包未签名和 notarize，首次打开可能需要通过 Finder 确认。
+- macOS 分发包使用 ad-hoc 签名，尚未进行 Developer ID 签名和 notarization；首次下载仍可能被
+  Gatekeeper 拦截。
 - 真实窗口、图标、WebView2 Runtime 和平台集成行为仍需按照 [GUI 验证](GUI_TESTING.md)
   在目标系统检查。

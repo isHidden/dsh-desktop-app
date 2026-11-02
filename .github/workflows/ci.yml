@@ -73,16 +73,6 @@ jobs:
             package_task: package:windows:webview
             artifact_name: dsh-desktop-windows-webview-x86_64
             artifact_path: dist/windows/DSH-Desktop-windows-x86_64-webview.zip
-          - name: macOS arm64 (cross-build)
-            os: ubuntu-24.04
-            package_task: package:macos:aarch64
-            artifact_name: dsh-desktop-macos-arm64
-            artifact_path: dist/macos/DSH-Desktop-macos-aarch64.tar.gz
-          - name: macOS x86_64 (cross-build)
-            os: ubuntu-24.04
-            package_task: package:macos:x86_64
-            artifact_name: dsh-desktop-macos-x86_64
-            artifact_path: dist/macos/DSH-Desktop-macos-x86_64.tar.gz
 
     steps:
       - name: Check out repository
@@ -105,10 +95,71 @@ jobs:
           retention-days: 7
           compression-level: 0
 
+  package-macos:
+    name: Package / ${{ matrix.name }}
+    needs: test
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64
+            os: macos-14
+            arch: aarch64
+            artifact_name: dsh-desktop-macos-arm64
+          - name: macOS x86_64
+            os: macos-15-intel
+            arch: x86_64
+            artifact_name: dsh-desktop-macos-x86_64
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.7
+
+      - name: Build and verify signed macOS distribution
+        run: deno task package:macos:${{ matrix.arch }}
+
+      - name: Launch unpacked macOS application
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf dist/macos/DSH-Desktop-macos-${{ matrix.arch }}.tar.gz -C "$RUNNER_TEMP"
+          app="$RUNNER_TEMP/DSH-Desktop.app"
+          open "$app"
+          sleep 15
+          pgrep -f "$app/Contents/MacOS/"
+          screencapture -x "$RUNNER_TEMP/macos-startup.png"
+
+      - name: Upload macOS startup evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-startup-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/macos-startup.png
+            ~/Library/Logs/dsh-desktop/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload verified macOS distribution
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/macos/DSH-Desktop-macos-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
   release:
     name: Recreate latest release
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: package
+    needs: [package, package-macos]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:

@@ -34,7 +34,7 @@ codesign --verify --deep --strict --verbose=4 "$app"
 
 while IFS= read -r -d '' bundle_file; do
   if [[ "$(file -b "$bundle_file")" == *Mach-O* ]]; then
-    lipo -verify_arch "$macos_arch" "$bundle_file"
+    lipo "$bundle_file" -verify_arch "$macos_arch"
     codesign --verify --strict --verbose=2 "$bundle_file"
   fi
 done < <(find "$app" -type f -print0)
